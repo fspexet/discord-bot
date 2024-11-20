@@ -1,0 +1,6 @@
+token: ""
+destination_channel_id: ""
+
+nicknames:
+  do_nicknames: false
+  nickname_source_guild_id: ""
