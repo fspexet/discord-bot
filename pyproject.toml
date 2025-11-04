@@ -1,0 +1,20 @@
+[project]
+name = "spexbot"
+version = "2.0.0"
+description = "En discordbot för att smidigaregöra komunikation mellan spexare och Styret på Discord."
+authors = [
+    {name = "Ludwig Granstedt",email = "ludwiggranstedt@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pyyaml (>=6.0.3,<7.0.0)",
+    "discord-py (>=2.6.4,<3.0.0)"
+]
+
+[project.scripts]
+main = "spexbot.main:main"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
