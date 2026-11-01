@@ -1,5 +1,6 @@
 token: ""
 destination_channel_id: ""
+admin_guild_id: ""
 
 nicknames:
   do_nicknames: false

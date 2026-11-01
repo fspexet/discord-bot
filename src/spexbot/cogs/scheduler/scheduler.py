@@ -1,83 +1,71 @@
 import logging
-from datetime import UTC, datetime
-from pathlib import Path
-from zoneinfo import ZoneInfo
 
 import discord
+from discord import app_commands
+from discord.ext import commands
+from discord.ext.commands.cog import _cog_special_method
+
+from spexbot.bot import SpexBot
+
+from . import db
+from .modals import ScheduleModal
 
 logger = logging.getLogger(__name__)
 
-class ScheduleModal(discord.ui.Modal, title="Schemalägg meddelande"):
-    when: discord.ui.TextInput = discord.ui.TextInput(
-        label="Skicka den",
-        placeholder="YYYY-MM-DD HH:MM",
-        min_length=16,
-        max_length=16
-    )
-    # TODO: Make this a Select instead
-    channel: discord.ui.TextInput = discord.ui.TextInput(
-        label="Destinationskanal",
-        placeholder="Lämna blank för din standard",
-        required=False,
-    )
 
-    def __init__(self, source: discord.Message, tz: str, default_channel_id: int | None):
-        super().__init__()
-        self.source = source
-        self.tz = tz
-        if default_channel_id is not None:
-            self.channel.default = str(default_channel_id)
+class Scheduler(commands.Cog):
+    """Allows users to schedule messages cross channels and guilds"""
 
-    async def on_submit(self, interaction: discord.Interaction):
-        # Parse the time in local time and store it as UTC
-        try:
-            local = datetime.strptime(self.when.value.strip(), "%Y-%m-%d %H:%M")
-            send_at = local.replace(tzinfo=ZoneInfo(self.tz)).astimezone(UTC)
-        except ValueError:
-            return await interaction.response.send_message(
-                "Kan inte tolka tiden. Använd YYYY-MM-DD HH:MM.", ephemeral=True
-            )
-        if send_at <= datetime.now(UTC):
-            return await interaction.response.send_message("Den angivna tiden är i det förflutna.")
+    def __init__(self, bot: SpexBot):
+        self.bot = bot
+        self.config = bot.config
+        self.database_path = bot.database_path
+        self.admin_guild = discord.Object(id=bot.admin_guild_id)
 
-        # Resolve and validate the destination channel
-        channel_id = int(self.channel.value) if self.channel.value.strip().isdigit() else None
-        destination = interaction.client.get_channel(channel_id) if channel_id else None
-        if destination is None:
-            return await interaction.response.send_message(
-                "Okänd kanal, eller så kan botten inte skicka dit.", ephemeral=True
-            )
-
-        if not isinstance(destination, (discord.TextChannel, discord.Thread)):
-            return await interaction.response.send_message(
-                "Okänd kanal, eller så kan botten inte skicka dit.", ephemeral=True
-            )
-
-        # Defer as attachment downloads can be slow
-        await interaction.response.defer(ephemeral=True, thinking=True)
-
-        saved = []
-        for attatchment in self.source.attachments:
-            path = Path(f"attatchments/{self.source.id}_{attatchment.filename}")
-            await attatchment.save(path)
-            saved.append((attatchment.filename, path))
-
-        # TODO: insert into DB
-
-        await interaction.followup.send(
-            f"Schemalagd för <t:{int(send_at.timestamp())}:F> i {destination.mention} ({destination.guild.name})"
+        self.schedule_ctx_menu = app_commands.ContextMenu(
+            name="Schemalägg meddelande",   # max 32 characters
+            callback=self.schedule_message,
         )
 
-    async def on_error( # type: ignore[override]
-        self, interaction: discord.Interaction, error: Exception, /
+    @_cog_special_method
+    async def cog_load(self):
+        self.bot.tree.add_command(self.schedule_ctx_menu, guild=self.admin_guild)
+
+    @_cog_special_method
+    async def cog_unload(self):
+        self.bot.tree.remove_command(
+            self.schedule_ctx_menu.name,
+            type=self.schedule_ctx_menu.type,
+            guild=self.admin_guild
+        )
+
+    async def schedule_message(
+        self, interaction: discord.Interaction, message: discord.Message
     ) -> None:
-        logger.exception("Schedule modal failed for user %s", interaction.user.id, exc_info=error)
-        
-        if interaction.response.is_done():
-            await interaction.followup.send("Något gick fel.", ephemeral=True)
-        else:
-            await interaction.response.send_message("Något gick fel.", ephemeral=True)
-        
+        tz, default_channel_id = (
+            "Europe/Stockholm",
+            None,
+        )  # TODO: Make this not hard coded
+
+        ids = await db.get_saved_destination_ids(self.database_path)
+
+        # Make sure the user's default channel is always offered, even if it isn't recent
+        if default_channel_id is not None and default_channel_id not in ids:
+            ids = [default_channel_id, *ids[:24]]
+
+        destinations: list[discord.TextChannel | discord.Thread] = []
+        for channel_id in ids:
+            channel = self.bot.get_channel(channel_id)
+            if (
+                isinstance(channel, (discord.TextChannel, discord.Thread))
+                and channel.permissions_for(channel.guild.me).send_messages
+            ):
+                destinations.append(channel)
+
+        await interaction.response.send_modal(
+            ScheduleModal(message, tz, destinations, default_channel_id, self.database_path)
+        )
 
 
-        
+async def setup(bot: SpexBot):
+    await bot.add_cog(Scheduler(bot))

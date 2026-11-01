@@ -17,6 +17,16 @@ def setup(filename: str):
         "(user_id INTEGER PRIMARY KEY, nickname TEXT)"
     )
 
+    # Skapa tabell för sparade kanaler
+    cursor.execute(
+        "CREATE TABLE IF NOT EXISTS saved_destinations (" \
+        "   channel_id      INTEGER PRIMARY KEY," \
+        "   guild_id        INTEGER NOT NULL," \
+        "   added_by        INTEGER NOT NULL," \
+        "   last_used_at    INTEGER NOT NULL" \
+        ")"
+    )
+
     cursor.close()
     conn.commit()
 
