@@ -1,5 +1,6 @@
 import sqlite3
 
+
 def setup(filename: str):
     conn = sqlite3.connect(filename)
     cursor = conn.cursor()

@@ -31,7 +31,5 @@ def is_valid_snowflake(snowflake_id: int) -> bool:
     # Check if timestamp is not in the future (with small buffer for clock skew)
     import time
     current_time_ms = int(time.time() * 1000)
-    if timestamp_ms > current_time_ms + 60000:  # 1 minute buffer
-        return False
     
-    return True
+    return timestamp_ms < current_time_ms + 60000  # 1 minute buffer
