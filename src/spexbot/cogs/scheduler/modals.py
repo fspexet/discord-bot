@@ -8,7 +8,7 @@ import discord
 
 from spexbot.helpers.validation import is_valid_snowflake
 
-from ..scheduler import db
+from .storage import channels
 
 logger = logging.getLogger(__name__)
 
@@ -49,13 +49,16 @@ class ScheduleModal(discord.ui.Modal, title="Schemalägg meddelande"):
                     for c in destinations
                 ],
                 max_values=1,
+                required=False,
             )
-            self.add_item(discord.ui.Label(text="Sparade kanaler", component=self.destination))
+            self.add_item(
+                discord.ui.Label(text="Sparade kanaler", component=self.destination)
+            )
 
         # Modal new destination text input
         self.new_destination: discord.ui.TextInput = discord.ui.TextInput(
             placeholder="Kanal-ID eller länk (har företräde om ifyllt)",
-            required=False,
+            required=not destinations,
             max_length=100,
         )
         self.add_item(discord.ui.Label(text="Ny kanal", component=self.new_destination))
@@ -124,7 +127,7 @@ class ScheduleModal(discord.ui.Modal, title="Schemalägg meddelande"):
         # Defer as attachment downloads can be slow
         await interaction.response.defer(ephemeral=True, thinking=True)
 
-        await db.save_destination(
+        await channels.save_destination(
             self.db_path, destination.id, destination.guild.id, interaction.user.id
         )
 

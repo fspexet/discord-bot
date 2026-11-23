@@ -7,8 +7,8 @@ from discord.ext.commands.cog import _cog_special_method
 
 from spexbot.bot import SpexBot
 
-from . import db
 from .modals import ScheduleModal
+from .storage import channels
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ class Scheduler(commands.Cog):
             None,
         )  # TODO: Make this not hard coded
 
-        ids = await db.get_saved_destination_ids(self.database_path)
+        ids = await channels.get_saved_destination_ids(self.database_path)
 
         # Make sure the user's default channel is always offered, even if it isn't recent
         if default_channel_id is not None and default_channel_id not in ids:
